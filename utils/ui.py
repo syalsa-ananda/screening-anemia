@@ -69,35 +69,6 @@ def inject_global_css():
             padding-top: 0 !important;
         }}
 
-        .sidebar-brand {{
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 22px 20px 18px 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.08);
-            margin-bottom: 4px;
-        }}
-        .sidebar-brand .mark {{
-            width: 38px;
-            height: 38px;
-            border-radius: 10px;
-            background: {SPECTRUM};
-            flex-shrink: 0;
-        }}
-        .sidebar-brand .name {{
-            font-family: 'Fraunces', serif;
-            color: #FFFFFF;
-            font-weight: 600;
-            font-size: 1.0rem;
-            line-height: 1.2;
-        }}
-        .sidebar-brand .sub {{
-            color: #8A93A8;
-            font-size: 0.72rem;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-        }}
-
         [data-testid="stSidebarNav"] {{ padding: 6px 10px; }}
 
         [data-testid="stSidebarNav"] a {{
@@ -227,48 +198,66 @@ def inject_global_css():
 
 
 def render_sidebar_brand():
-    """Header branding di bagian atas sidebar, dipindah ke posisi pertama via JS.
+    """Header branding ditempel fixed di atas sidebar via CSS, bukan urutan DOM.
 
     st.navigation() selalu merender daftar menu di posisi pertama DOM
-    sidebar terlepas urutan kode Python atau CSS order/flex (struktur
-    container internalnya bisa bervariasi antar versi Streamlit/browser).
-    Cara paling pasti adalah memindahkan elemen secara aktif via JavaScript
-    setelah render selesai.
+    sidebar terlepas urutan kode Python, CSS order/flex, atau JavaScript
+    yang menebak struktur container (terbukti tidak konsisten antar versi
+    Streamlit). Solusi yang sepenuhnya independen dari DOM adalah
+    position:fixed yang menempel ke koordinat viewport, lalu memberi
+    padding-top pada konten asli sidebar supaya tidak tertutup.
     """
     st.markdown(
         """
-        <div id="sidebar-brand-anchor" class="sidebar-brand">
+        <style>
+        .sidebar-brand-fixed {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 21rem;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 22px 20px 18px 20px;
+            background: #1B1F2A;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .sidebar-brand-fixed .mark {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: linear-gradient(90deg, #8B2942 0%, #B8556F 35%, #E8C4A0 75%, #F7F3ED 100%);
+            flex-shrink: 0;
+        }
+        .sidebar-brand-fixed .name {
+            font-family: 'Fraunces', serif;
+            color: #FFFFFF;
+            font-weight: 600;
+            font-size: 1.0rem;
+            line-height: 1.2;
+        }
+        .sidebar-brand-fixed .sub {
+            color: #8A93A8;
+            font-size: 0.72rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        /* Beri jarak pada konten navigasi asli supaya tidak tertutup brand fixed */
+        [data-testid="stSidebarNav"] {
+            margin-top: 84px !important;
+        }
+        @media (max-width: 640px) {
+            .sidebar-brand-fixed { width: 100%; }
+        }
+        </style>
+        <div class="sidebar-brand-fixed">
             <div class="mark"></div>
             <div>
                 <div class="name">Skrining Anemia</div>
                 <div class="sub">Non-Invasif</div>
             </div>
         </div>
-        <script>
-        (function() {
-            function moveBrandToTop() {
-                const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
-                const brand = window.parent.document.getElementById('sidebar-brand-anchor');
-                if (!sidebar || !brand) return false;
-                const container = sidebar.querySelector('[data-testid="stSidebarContent"]')
-                    || sidebar.querySelector('[data-testid="stSidebarUserContent"]')
-                    || sidebar.firstElementChild;
-                if (!container) return false;
-                const brandWrapper = brand.closest('[data-testid="stVerticalBlock"]') || brand.parentElement;
-                if (container.firstElementChild !== brandWrapper) {
-                    container.insertBefore(brandWrapper, container.firstElementChild);
-                }
-                return true;
-            }
-            let attempts = 0;
-            const interval = setInterval(function() {
-                attempts += 1;
-                if (moveBrandToTop() || attempts > 20) {
-                    clearInterval(interval);
-                }
-            }, 100);
-        })();
-        </script>
         """,
         unsafe_allow_html=True,
     )
