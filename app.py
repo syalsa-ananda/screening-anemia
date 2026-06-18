@@ -4,7 +4,7 @@ Entry point utama — router navigasi & halaman Beranda.
 
 import streamlit as st
 
-from utils.ui import inject_global_css
+from utils.ui import inject_global_css, render_sidebar_brand
 from views import skrining, edukasi, riwayat, faq
 
 
@@ -105,8 +105,12 @@ faq_page = st.Page(faq.render, title="FAQ", icon="❓", url_path="faq")
 
 pg = st.navigation(
     [beranda_page, skrining_page, edukasi_page, riwayat_page, faq_page],
-    position="top",
+    position="sidebar",
 )
 
 inject_global_css()
+
+with st.sidebar:
+    render_sidebar_brand()
+
 pg.run()

@@ -37,7 +37,7 @@ streamlit_app/
 4. **📋 Riwayat** — daftar prediksi yang dilakukan dalam sesi browser saat ini.
 5. **❓ FAQ** — pertanyaan umum, disclaimer medis, dan info dataset/metodologi.
 
-Navigasi antar halaman menggunakan `st.navigation()` resmi dari Streamlit (membutuhkan Streamlit ≥1.36), ditampilkan sebagai tab horizontal di bagian atas.
+Navigasi antar halaman menggunakan `st.navigation()` resmi dari Streamlit (membutuhkan Streamlit ≥1.36), ditampilkan sebagai sidebar gelap collapsible di sisi kiri, dengan branding kecil di bagian atas sidebar.
 
 ## Langkah Persiapan Sebelum Deploy
 

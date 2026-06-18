@@ -23,9 +23,80 @@ def inject_global_css():
         }}
         header[data-testid="stHeader"] {{ background: transparent; }}
 
-        /* Styling untuk navigasi st.navigation (tampil sebagai tab atas) */
-        [data-testid="stNavigationTabs"] button {{
+        /* ── Sidebar navigasi gelap (mirip referensi dashboard) ──────────── */
+        [data-testid="stSidebar"] {{
+            background: #14213D;
+            border-right: none;
+        }}
+        [data-testid="stSidebar"] > div:first-child {{
+            padding-top: 1.2rem;
+        }}
+
+        /* Judul/branding kecil di atas sidebar (opsional, lihat render_sidebar_brand) */
+        .sidebar-brand {{
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 4px 18px 18px 18px;
+            margin-bottom: 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }}
+        .sidebar-brand .logo {{
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            background: {PRIMARY};
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.05rem;
+        }}
+        .sidebar-brand .name {{
+            color: #FFFFFF;
+            font-weight: 700;
+            font-size: 0.95rem;
+            line-height: 1.15;
+        }}
+        .sidebar-brand .sub {{
+            color: #8B95B3;
+            font-size: 0.72rem;
+        }}
+
+        /* Item navigasi st.navigation di sidebar */
+        [data-testid="stSidebarNav"] {{
+            padding: 4px 10px;
+        }}
+        [data-testid="stSidebarNav"] a,
+        [data-testid="stSidebarNav"] [data-testid="stPageLink"] {{
+            border-radius: 10px;
+            margin: 2px 4px;
+            transition: background 0.15s ease;
+        }}
+        [data-testid="stSidebarNav"] span,
+        [data-testid="stSidebarNav"] p {{
+            color: #AEB6CC !important;
             font-weight: 600;
+            font-size: 0.92rem;
+        }}
+        [data-testid="stSidebarNav"] a:hover {{
+            background: rgba(255,255,255,0.06);
+        }}
+        [data-testid="stSidebarNav"] a:hover span,
+        [data-testid="stSidebarNav"] a:hover p {{
+            color: #FFFFFF !important;
+        }}
+        [data-testid="stSidebarNav"] a[aria-current="page"] {{
+            background: {PRIMARY};
+        }}
+        [data-testid="stSidebarNav"] a[aria-current="page"] span,
+        [data-testid="stSidebarNav"] a[aria-current="page"] p {{
+            color: #FFFFFF !important;
+        }}
+
+        /* Collapse control tetap terlihat di atas background gelap */
+        [data-testid="stSidebarCollapsedControl"] svg,
+        [data-testid="stSidebarCollapseButton"] svg {{
+            color: #AEB6CC;
         }}
 
         /* Kartu umum */
@@ -98,6 +169,22 @@ def inject_global_css():
 
         footer {{ visibility: hidden; }}
         </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_sidebar_brand():
+    """Tampilkan branding kecil (logo + nama) di bagian atas sidebar."""
+    st.markdown(
+        """
+        <div class="sidebar-brand">
+            <div class="logo">🩺</div>
+            <div>
+                <div class="name">Skrining Anemia</div>
+                <div class="sub">Non-Invasif</div>
+            </div>
+        </div>
         """,
         unsafe_allow_html=True,
     )
