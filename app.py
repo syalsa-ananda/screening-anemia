@@ -4,13 +4,13 @@ Entry point utama — router navigasi & halaman Beranda.
 
 import streamlit as st
 
-from utils.ui import inject_global_css, render_sidebar_brand
+from utils.ui import inject_global_css, render_sidebar_brand, spectrum_divider
 from views import skrining, edukasi, riwayat, faq
 
 
 st.set_page_config(
-    page_title="Skrining Anemia Non-Invasif",
-    page_icon="🩺",
+    page_title="Spektrum — Skrining Anemia Non-Invasif",
+    page_icon="🩸",
     layout="wide",
 )
 
@@ -19,10 +19,12 @@ def render_beranda():
     st.markdown(
         """
         <div class="hero">
-            <h1>🩺 Skrining Anemia Non-Invasif</h1>
+            <div class="eyebrow">Skrining non-invasif</div>
+            <h1>Warna mata Anda<br>sudah bicara banyak.</h1>
             <p>
-                Deteksi kemungkinan anemia hanya dari foto konjungtiva mata —
-                tanpa jarum, tanpa darah, hasil dalam hitungan detik.
+                Konjungtiva — bagian dalam kelopak mata bawah — berubah pucat
+                saat hemoglobin menurun. Satu foto cukup untuk membaca sinyal itu,
+                tanpa jarum dan tanpa menunggu hasil laboratorium.
             </p>
         </div>
         """,
@@ -32,57 +34,53 @@ def render_beranda():
     st.markdown(
         """
         <div class="app-card">
-            <span class="badge">NON-INVASIF</span>
-            <span class="badge">REAL-TIME</span>
-            <span class="badge">BERBASIS AI</span>
-            <h3>Apa itu sistem ini?</h3>
+            <span class="badge">Non-invasif</span>
+            <span class="badge">Real-time</span>
+            <span class="badge">Ensemble Learning</span>
+            <h3>Bagaimana ini bekerja</h3>
             <p>
-                Sistem ini melakukan skrining anemia secara non-invasif dengan
-                menganalisis citra konjungtiva palpebra — bagian dalam kelopak
-                mata bawah yang warnanya berubah pucat ketika kadar hemoglobin
-                menurun. Cukup unggah satu foto, sistem akan menganalisis warna
-                dan tekstur konjungtiva menggunakan kombinasi fitur
-                <b>LBP (Local Binary Pattern)</b>, <b>GLCM</b>, dan
-                <b>Color Histogram</b>, lalu mengklasifikasikannya dengan
-                model <b>Ensemble Learning</b> (gabungan SVM, Random Forest,
-                dan Gradient Boosting).
+                Setiap foto diproses menjadi 346 ukuran tekstur dan warna —
+                kombinasi <b>Local Binary Pattern</b>, <b>Gray-Level
+                Co-occurrence Matrix</b>, dan <b>histogram warna</b> lintas tiga
+                ruang warna. Tiga model berbeda — Support Vector Machine,
+                Random Forest, dan Gradient Boosting — lalu memberi suara
+                bersama untuk satu keputusan akhir.
             </p>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    st.subheader("Bagaimana cara kerjanya?")
+    spectrum_divider(thin=True)
+    st.markdown("### Lima langkah, satu hasil")
     st.markdown(
         """
         <div class="step-row">
-            <div class="step-pill"><div class="num">1</div><div class="label">Unggah Foto<br>Konjungtiva</div></div>
-            <div class="step-pill"><div class="num">2</div><div class="label">Pra-Pemrosesan<br>(CLAHE)</div></div>
-            <div class="step-pill"><div class="num">3</div><div class="label">Ekstraksi Fitur<br>(346 Dimensi)</div></div>
-            <div class="step-pill"><div class="num">4</div><div class="label">Klasifikasi<br>Ensemble Learning</div></div>
-            <div class="step-pill"><div class="num">5</div><div class="label">Hasil &amp;<br>Probabilitas</div></div>
+            <div class="step-pill"><span class="num">01</span><div class="label">Unggah foto konjungtiva</div></div>
+            <div class="step-pill"><span class="num">02</span><div class="label">Penyetaraan kontras (CLAHE)</div></div>
+            <div class="step-pill"><span class="num">03</span><div class="label">346 ukuran tekstur &amp; warna</div></div>
+            <div class="step-pill"><span class="num">04</span><div class="label">Tiga model memberi suara</div></div>
+            <div class="step-pill"><span class="num">05</span><div class="label">Hasil dan tingkat keyakinan</div></div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
     st.write("")
-    col1, col2, col3 = st.columns([1, 1.4, 1])
+    col1, col2, col3 = st.columns([1, 1.3, 1])
     with col2:
-        st.page_link(skrining_page, label="🔍  Mulai Skrining Sekarang", use_container_width=True)
+        st.page_link(skrining_page, label="Mulai skrining", use_container_width=True)
 
     st.write("")
     st.markdown(
-        """
+        f"""
         <div class="app-card">
-            <h3>Mengapa bisa dipercaya?</h3>
+            <h3>Diuji di luar data latih</h3>
             <p>
-                Model telah diuji pada 334 data uji independen dari tiga sumber
-                populasi berbeda (Ghana, Italia-India, dan dataset Palpebral
-                Conjunctiva), mencapai <b>akurasi 92.51%</b> dengan
-                <b>sensitivitas 95%</b> dan <b>spesifisitas 90%</b> — melampaui
-                standar minimum WHO untuk sistem skrining anemia berbasis
-                teknologi.
+                Pada 334 foto yang belum pernah dilihat model, sistem mencapai
+                <b>akurasi 92,5%</b> — sensitivitas 95%, spesifisitas 90%.
+                Diuji lintas tiga populasi berbeda: Ghana, Italia–India, dan
+                kumpulan data Palpebral Conjunctiva.
             </p>
         </div>
         """,
@@ -90,9 +88,8 @@ def render_beranda():
     )
 
     st.caption(
-        "⚠️ Sistem ini adalah alat bantu skrining awal untuk tujuan edukasi dan "
-        "penelitian, bukan pengganti diagnosis medis profesional. Lihat halaman "
-        "FAQ untuk informasi lebih lanjut."
+        "Alat bantu skrining awal untuk tujuan edukasi dan penelitian — "
+        "bukan pengganti diagnosis medis. Selengkapnya di halaman FAQ."
     )
 
 

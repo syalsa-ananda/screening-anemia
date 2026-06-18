@@ -10,10 +10,11 @@ from PIL import Image
 
 from utils.feature_extraction import extract_all_features, load_and_resize, preprocess_image
 from utils.model_loader import load_model_and_scaler
+from utils.ui import spectrum_divider
 
 
 LABELS = {0: "Non-Anemia", 1: "Anemia"}
-COLORS = {0: "#4C72B0", 1: "#DD8452"}
+COLORS = {0: "#5C7A6B", 1: "#8B2942"}
 
 
 def pil_to_bgr(pil_image: Image.Image) -> np.ndarray:
@@ -46,18 +47,13 @@ def render():
     if "history" not in st.session_state:
         st.session_state.history = []
 
-    st.markdown(
-        """
-        <div class="app-card" style="margin-bottom:18px;">
-            <h3>🔍 Skrining Anemia</h3>
-            <p style="margin-bottom:0;">
-                Unggah foto konjungtiva (bagian dalam kelopak mata bawah) untuk
-                mendapatkan prediksi kemungkinan anemia secara <i>real-time</i>.
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    st.markdown('<div class="eyebrow" style="color:#8B2942;">Skrining</div>', unsafe_allow_html=True)
+    st.markdown("### Unggah satu foto konjungtiva")
+    st.caption(
+        "Bagian dalam kelopak mata bawah — tarik kelopak sedikit ke bawah "
+        "saat memotret agar area konjungtiva terlihat jelas."
     )
+    spectrum_divider(thin=True)
 
     try:
         model, scaler = load_model_and_scaler()
@@ -67,7 +63,7 @@ def render():
         st.error(str(e))
 
     uploaded_file = st.file_uploader(
-        "Pilih atau seret foto konjungtiva",
+        "Pilih atau seret foto",
         type=["jpg", "jpeg", "png"],
         disabled=not model_ready,
     )
@@ -89,10 +85,10 @@ def render():
 
         # ── Pra-pemrosesan ────────────────────────────────────────────────
         st.markdown('<div class="app-card">', unsafe_allow_html=True)
-        st.subheader("Pra-Pemrosesan Citra")
+        st.markdown("##### Penyetaraan kontras")
         col_a, col_b = st.columns(2)
         with col_a:
-            st.image(result["img_original"], caption="Citra Asli (setelah resize)", use_container_width=True)
+            st.image(result["img_original"], caption="Sebelum", use_container_width=True)
         with col_b:
             st.image(result["img_clahe"], caption="Setelah CLAHE", use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
@@ -100,42 +96,39 @@ def render():
         # ── Hasil prediksi ────────────────────────────────────────────────
         pred_color = COLORS[result["kode"]]
         st.markdown('<div class="app-card">', unsafe_allow_html=True)
-        st.subheader("Hasil Prediksi")
+        st.markdown("##### Hasil")
         col_pred, col_conf = st.columns(2)
         with col_pred:
             st.markdown(
-                f"<h2 style='color:{pred_color};'>● {result['label']}</h2>",
+                f"<h2 style='color:{pred_color}; font-style:italic; margin:0;'>{result['label']}</h2>",
                 unsafe_allow_html=True,
             )
         with col_conf:
-            st.metric("Tingkat Kepercayaan", f"{result['confidence']:.1%}")
+            st.metric("Tingkat keyakinan", f"{result['confidence']:.1%}")
 
         if result["kode"] == 1:
             st.warning(
-                "Hasil menunjukkan indikasi anemia. Disarankan melakukan "
-                "pemeriksaan laboratorium untuk konfirmasi kadar hemoglobin."
+                "Indikasi anemia terdeteksi. Pemeriksaan laboratorium "
+                "disarankan untuk konfirmasi kadar hemoglobin."
             )
         else:
-            st.success(
-                "Hasil menunjukkan tidak ada indikasi anemia. Tetap jaga "
-                "pola makan dan kesehatan secara umum."
-            )
+            st.success("Tidak ada indikasi anemia pada foto ini.")
         st.markdown("</div>", unsafe_allow_html=True)
 
         # ── Grafik probabilitas ─────────────────────────────────────────────
         st.markdown('<div class="app-card">', unsafe_allow_html=True)
-        st.subheader("Distribusi Probabilitas")
+        st.markdown("##### Distribusi probabilitas")
         proba_df = pd.DataFrame(
             {
                 "Kelas": ["Non-Anemia", "Anemia"],
                 "Probabilitas": [result["proba_non_anemia"], result["proba_anemia"]],
             }
         ).set_index("Kelas")
-        st.bar_chart(proba_df, color=["#4C72B0"], height=280)
+        st.bar_chart(proba_df, color=["#8B2942"], height=260)
 
         col_p1, col_p2 = st.columns(2)
-        col_p1.metric("P(Non-Anemia)", f"{result['proba_non_anemia']:.1%}")
-        col_p2.metric("P(Anemia)", f"{result['proba_anemia']:.1%}")
+        col_p1.metric("Non-Anemia", f"{result['proba_non_anemia']:.1%}")
+        col_p2.metric("Anemia", f"{result['proba_anemia']:.1%}")
         st.markdown("</div>", unsafe_allow_html=True)
 
-        st.caption("📋 Buka menu **Riwayat** di navbar atas untuk melihat seluruh riwayat prediksi sesi ini.")
+        st.caption("Lihat seluruh riwayat prediksi sesi ini di menu Riwayat.")
