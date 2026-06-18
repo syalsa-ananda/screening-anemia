@@ -4,30 +4,8 @@ Halaman FAQ — pertanyaan umum seputar penggunaan aplikasi.
 
 import streamlit as st
 
-from utils.ui import inject_global_css, render_navbar
 
-
-st.set_page_config(
-    page_title="FAQ — Skrining Anemia",
-    page_icon="❓",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
-
-inject_global_css()
-render_navbar("❓ FAQ")
-
-st.markdown(
-    """
-    <div class="hero" style="background: linear-gradient(135deg, #4C72B0 0%, #2F4A73 100%);">
-        <h1>❓ Pertanyaan Umum</h1>
-        <p>Hal-hal yang sering ditanyakan seputar sistem skrining anemia ini.</p>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-faqs = [
+FAQS = [
     (
         "Apakah hasil prediksi ini akurat?",
         """
@@ -115,22 +93,34 @@ faqs = [
     ),
 ]
 
-for question, answer in faqs:
-    with st.expander(f"**{question}**"):
-        st.markdown(answer, unsafe_allow_html=True)
 
-st.write("")
-st.markdown(
-    """
-    <div class="app-card" style="background:#FFF7ED; border-color:#FED7AA;">
-        <h3 style="margin-top:0;">⚠️ Disclaimer</h3>
-        <p style="margin-bottom:0;">
-            Sistem ini dikembangkan untuk tujuan penelitian dan edukasi.
-            Hasil prediksi tidak boleh dijadikan satu-satunya dasar
-            keputusan medis. Selalu konsultasikan kondisi kesehatan Anda
-            dengan dokter atau tenaga medis profesional.
-        </p>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+def render():
+    st.markdown(
+        """
+        <div class="hero" style="background: linear-gradient(135deg, #4C72B0 0%, #2F4A73 100%);">
+            <h1>❓ Pertanyaan Umum</h1>
+            <p>Hal-hal yang sering ditanyakan seputar sistem skrining anemia ini.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    for question, answer in FAQS:
+        with st.expander(f"**{question}**"):
+            st.markdown(answer, unsafe_allow_html=True)
+
+    st.write("")
+    st.markdown(
+        """
+        <div class="app-card" style="background:#FFF7ED; border-color:#FED7AA;">
+            <h3 style="margin-top:0;">⚠️ Disclaimer</h3>
+            <p style="margin-bottom:0;">
+                Sistem ini dikembangkan untuk tujuan penelitian dan edukasi.
+                Hasil prediksi tidak boleh dijadikan satu-satunya dasar
+                keputusan medis. Selalu konsultasikan kondisi kesehatan Anda
+                dengan dokter atau tenaga medis profesional.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )

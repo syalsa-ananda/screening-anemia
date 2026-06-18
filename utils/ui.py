@@ -1,6 +1,7 @@
 """
-Modul styling dan komponen UI bersama untuk seluruh halaman aplikasi.
-Menyediakan tema visual custom, navbar atas, dan helper komponen kartu/metrik.
+Modul styling bersama untuk seluruh halaman aplikasi.
+Navigasi antar halaman ditangani oleh st.navigation() di app.py,
+modul ini hanya menyediakan tema visual (CSS) dan komponen kartu.
 """
 
 import streamlit as st
@@ -9,47 +10,22 @@ import streamlit as st
 PRIMARY = "#DD8452"
 SECONDARY = "#4C72B0"
 DARK = "#1F2937"
-BG_SOFT = "#FAFAFA"
 
 
 def inject_global_css():
-    """Suntikkan CSS global: sembunyikan sidebar, tema warna, kartu, dan navbar."""
+    """Suntikkan CSS global: tema warna, kartu, hero, dan styling navigasi atas."""
     st.markdown(
         f"""
         <style>
-        /* Sembunyikan sidebar Streamlit bawaan & nav multipage default */
-        [data-testid="stSidebar"] {{ display: none; }}
-        [data-testid="stSidebarCollapsedControl"] {{ display: none; }}
-        header[data-testid="stHeader"] {{ background: transparent; }}
-
         .block-container {{
-            padding-top: 1.2rem;
+            padding-top: 1.5rem;
             max-width: 980px;
         }}
+        header[data-testid="stHeader"] {{ background: transparent; }}
 
-        /* Navbar custom — styling untuk st.page_link */
-        .navbar-wrap {{
-            background: {DARK};
-            border-radius: 14px;
-            padding: 8px;
-            margin-bottom: 4px;
-        }}
-        .navbar-wrap [data-testid="stPageLink"] {{
-            background: transparent;
-            border-radius: 10px;
-        }}
-        .navbar-wrap [data-testid="stPageLink"] p {{
-            color: #D1D5DB;
+        /* Styling untuk navigasi st.navigation (tampil sebagai tab atas) */
+        [data-testid="stNavigationTabs"] button {{
             font-weight: 600;
-            font-size: 0.88rem;
-            text-align: center;
-            margin: 0;
-        }}
-        .navbar-wrap [data-testid="stPageLink"]:hover {{
-            background: #374151;
-        }}
-        .navbar-wrap [data-testid="stPageLink"]:hover p {{
-            color: #FFFFFF;
         }}
 
         /* Kartu umum */
@@ -61,9 +37,7 @@ def inject_global_css():
             margin-bottom: 20px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }}
-        .app-card h3 {{
-            margin-top: 0;
-        }}
+        .app-card h3 {{ margin-top: 0; }}
 
         /* Hero header */
         .hero {{
@@ -73,16 +47,8 @@ def inject_global_css():
             color: white;
             margin-bottom: 24px;
         }}
-        .hero h1 {{
-            color: white;
-            margin: 0 0 8px 0;
-            font-size: 2.0rem;
-        }}
-        .hero p {{
-            color: #E5E9F2;
-            font-size: 1.02rem;
-            margin: 0;
-        }}
+        .hero h1 {{ color: white; margin: 0 0 8px 0; font-size: 2.0rem; }}
+        .hero p {{ color: #E5E9F2; font-size: 1.02rem; margin: 0; }}
 
         /* Step pill untuk alur kerja */
         .step-row {{
@@ -135,23 +101,3 @@ def inject_global_css():
         """,
         unsafe_allow_html=True,
     )
-
-
-NAV_ITEMS = [
-    ("🏠 Beranda", "app.py"),
-    ("🔍 Skrining", "pages/1_Skrining.py"),
-    ("🩸 Edukasi Anemia", "pages/2_Edukasi_Anemia.py"),
-    ("📋 Riwayat", "pages/3_Riwayat.py"),
-    ("❓ FAQ", "pages/4_FAQ.py"),
-]
-
-
-def render_navbar(active_label: str):
-    """Render navbar horizontal menggunakan st.page_link, dibungkus styling custom."""
-    st.markdown('<div class="navbar-wrap">', unsafe_allow_html=True)
-    cols = st.columns(len(NAV_ITEMS))
-    for col, (label, target) in zip(cols, NAV_ITEMS):
-        with col:
-            st.page_link(target, label=label, use_container_width=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown("<div style='margin-bottom:10px'></div>", unsafe_allow_html=True)

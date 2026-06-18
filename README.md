@@ -6,12 +6,13 @@ Aplikasi web untuk skrining anemia non-invasif berbasis citra konjungtiva, mengg
 
 ```
 streamlit_app/
-├── app.py                          # Halaman Beranda
-├── pages/
-│   ├── 1_Skrining.py                # Upload, prediksi, hasil
-│   ├── 2_Edukasi_Anemia.py          # Edukasi kesehatan tentang anemia
-│   ├── 3_Riwayat.py                 # Riwayat prediksi sesi
-│   └── 4_FAQ.py                     # FAQ + disclaimer + info dataset/performa
+├── app.py                          # Entry point + router (st.navigation)
+├── views/
+│   ├── __init__.py
+│   ├── skrining.py                  # Upload, prediksi, hasil
+│   ├── edukasi.py                   # Edukasi kesehatan tentang anemia
+│   ├── riwayat.py                   # Riwayat prediksi sesi
+│   └── faq.py                       # FAQ + disclaimer + info dataset/performa
 ├── requirements.txt                # Daftar dependency Python
 ├── packages.txt                    # Dependency sistem (libgl1 untuk OpenCV)
 ├── .streamlit/
@@ -22,7 +23,7 @@ streamlit_app/
 │   └── scaler_final.pkl            # (Anda upload sendiri) StandardScaler
 ├── utils/
 │   ├── __init__.py
-│   ├── ui.py                        # CSS global, navbar custom
+│   ├── ui.py                        # CSS global, tema kartu & hero
 │   ├── feature_extraction.py       # Pipeline ekstraksi fitur 346 dimensi
 │   └── model_loader.py             # Loader model dengan caching
 └── assets/                         # (opsional) gambar contoh, logo, dll.
@@ -36,7 +37,7 @@ streamlit_app/
 4. **📋 Riwayat** — daftar prediksi yang dilakukan dalam sesi browser saat ini.
 5. **❓ FAQ** — pertanyaan umum, disclaimer medis, dan info dataset/metodologi.
 
-Navigasi antar halaman menggunakan navbar custom di bagian atas (sidebar Streamlit disembunyikan).
+Navigasi antar halaman menggunakan `st.navigation()` resmi dari Streamlit (membutuhkan Streamlit ≥1.36), ditampilkan sebagai tab horizontal di bagian atas.
 
 ## Langkah Persiapan Sebelum Deploy
 
