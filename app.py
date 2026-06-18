@@ -101,9 +101,7 @@ riwayat_page = st.Page(riwayat.render, title="Riwayat", url_path="riwayat")
 faq_page = st.Page(faq.render, title="FAQ", url_path="faq")
 
 inject_global_css()
-
-with st.sidebar:
-    render_sidebar_brand()
+render_sidebar_brand()
 
 pg = st.navigation(
     [beranda_page, skrining_page, edukasi_page, riwayat_page, faq_page],

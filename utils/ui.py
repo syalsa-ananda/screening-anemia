@@ -198,29 +198,32 @@ def inject_global_css():
 
 
 def render_sidebar_brand():
-    """Header branding di atas sidebar via pseudo-element ::before.
+    """Header branding di atas daftar menu sidebar, via ::before pada stSidebarNav.
 
     st.navigation() selalu merender daftar menu di posisi pertama DOM
-    sidebar terlepas urutan kode Python, JavaScript, atau position:fixed
-    (yang ternyata salah lebar karena meniru ukuran sidebar secara manual).
-    Pseudo-element ::before pada container sidebar utama dijamin selalu
-    tampil sebelum seluruh konten asli elemen tersebut -- ini aturan baku
-    CSS, bukan tebakan struktur DOM, sehingga lebar & posisi otomatis
-    ikut mengikuti sidebar aslinya tanpa hardcode ukuran apapun.
+    sidebar. Pendekatan elemen HTML terpisah (markdown, JS, fixed/absolute
+    positioning) semuanya gagal karena bergantung pada asumsi struktur
+    parent yang ternyata tidak konsisten. Solusi paling pasti: suntik
+    brand sebagai ::before pada [data-testid="stSidebarNav"] itu sendiri.
+    Pseudo-element selalu dirender sebelum isi asli elemen -- ini perilaku
+    CSS baku, bukan tebakan, dan otomatis mengikuti lebar elemen induknya.
     """
+    droplet_svg = (
+        "data:image/svg+xml;utf8,"
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'>"
+        "<path d='M12 2C12 2 5 11 5 16C5 19.866 8.134 23 12 23C15.866 23 19 19.866 19 16C19 11 12 2 12 2Z' "
+        "fill='%238B2942' stroke='%23E8C4A0' stroke-width='1'/>"
+        "</svg>"
+    )
     st.markdown(
-        """
+        f"""
         <style>
-        [data-testid="stSidebarContent"]::before,
-        [data-testid="stSidebarUserContent"]::before {
-            content: "";
-            display: block;
-            height: 76px;
-        }
-        [data-testid="stSidebar"] {
+        [data-testid="stSidebarNav"] {{
             position: relative;
-        }
-        .sidebar-brand-overlay {
+            padding-top: 78px !important;
+        }}
+        [data-testid="stSidebarNav"]::before {{
+            content: "Skrining Anemia";
             position: absolute;
             top: 0;
             left: 0;
@@ -228,54 +231,20 @@ def render_sidebar_brand():
             height: 76px;
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 0 20px;
-            background: #1B1F2A;
+            padding: 0 20px 0 56px;
+            background-color: #1B1F2A;
+            background-image: url("{droplet_svg}");
+            background-repeat: no-repeat;
+            background-position: 18px center;
+            background-size: 22px 22px;
             border-bottom: 1px solid rgba(255,255,255,0.08);
-            z-index: 10;
-        }
-        .sidebar-brand-overlay .mark {
-            width: 34px;
-            height: 34px;
-            border-radius: 8px;
-            background: #262B3A;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-        .sidebar-brand-overlay .mark svg {
-            width: 19px;
-            height: 19px;
-        }
-        .sidebar-brand-overlay .name {
             font-family: 'Fraunces', serif;
-            color: #FFFFFF;
             font-weight: 600;
             font-size: 0.98rem;
-            line-height: 1.2;
-        }
-        .sidebar-brand-overlay .sub {
-            color: #8A93A8;
-            font-size: 0.7rem;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-        }
+            color: #FFFFFF;
+            z-index: 5;
+        }}
         </style>
-        <div class="sidebar-brand-overlay">
-            <div class="mark">
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M2 12C2 12 5.5 5 12 5C18.5 5 22 12 22 12C22 12 18.5 19 12 19C5.5 19 2 12 2 12Z"
-                          stroke="#E8C4A0" stroke-width="1.6" stroke-linejoin="round"/>
-                    <circle cx="12" cy="12" r="3.2" stroke="#8B2942" stroke-width="1.6"/>
-                    <circle cx="12" cy="12" r="1.1" fill="#8B2942"/>
-                </svg>
-            </div>
-            <div>
-                <div class="name">Skrining Anemia</div>
-                <div class="sub">Non-Invasif</div>
-            </div>
-        </div>
         """,
         unsafe_allow_html=True,
     )
