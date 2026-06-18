@@ -198,61 +198,79 @@ def inject_global_css():
 
 
 def render_sidebar_brand():
-    """Header branding ditempel fixed di atas sidebar via CSS, bukan urutan DOM.
+    """Header branding di atas sidebar via pseudo-element ::before.
 
     st.navigation() selalu merender daftar menu di posisi pertama DOM
-    sidebar terlepas urutan kode Python, CSS order/flex, atau JavaScript
-    yang menebak struktur container (terbukti tidak konsisten antar versi
-    Streamlit). Solusi yang sepenuhnya independen dari DOM adalah
-    position:fixed yang menempel ke koordinat viewport, lalu memberi
-    padding-top pada konten asli sidebar supaya tidak tertutup.
+    sidebar terlepas urutan kode Python, JavaScript, atau position:fixed
+    (yang ternyata salah lebar karena meniru ukuran sidebar secara manual).
+    Pseudo-element ::before pada container sidebar utama dijamin selalu
+    tampil sebelum seluruh konten asli elemen tersebut -- ini aturan baku
+    CSS, bukan tebakan struktur DOM, sehingga lebar & posisi otomatis
+    ikut mengikuti sidebar aslinya tanpa hardcode ukuran apapun.
     """
     st.markdown(
         """
         <style>
-        .sidebar-brand-fixed {
-            position: fixed;
+        [data-testid="stSidebarContent"]::before,
+        [data-testid="stSidebarUserContent"]::before {
+            content: "";
+            display: block;
+            height: 76px;
+        }
+        [data-testid="stSidebar"] {
+            position: relative;
+        }
+        .sidebar-brand-overlay {
+            position: absolute;
             top: 0;
             left: 0;
-            width: 21rem;
-            z-index: 999;
+            right: 0;
+            height: 76px;
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 22px 20px 18px 20px;
+            padding: 0 20px;
             background: #1B1F2A;
             border-bottom: 1px solid rgba(255,255,255,0.08);
+            z-index: 10;
         }
-        .sidebar-brand-fixed .mark {
-            width: 38px;
-            height: 38px;
-            border-radius: 10px;
-            background: linear-gradient(90deg, #8B2942 0%, #B8556F 35%, #E8C4A0 75%, #F7F3ED 100%);
+        .sidebar-brand-overlay .mark {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            background: #262B3A;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             flex-shrink: 0;
         }
-        .sidebar-brand-fixed .name {
+        .sidebar-brand-overlay .mark svg {
+            width: 19px;
+            height: 19px;
+        }
+        .sidebar-brand-overlay .name {
             font-family: 'Fraunces', serif;
             color: #FFFFFF;
             font-weight: 600;
-            font-size: 1.0rem;
+            font-size: 0.98rem;
             line-height: 1.2;
         }
-        .sidebar-brand-fixed .sub {
+        .sidebar-brand-overlay .sub {
             color: #8A93A8;
-            font-size: 0.72rem;
+            font-size: 0.7rem;
             letter-spacing: 0.04em;
             text-transform: uppercase;
         }
-        /* Beri jarak pada konten navigasi asli supaya tidak tertutup brand fixed */
-        [data-testid="stSidebarNav"] {
-            margin-top: 84px !important;
-        }
-        @media (max-width: 640px) {
-            .sidebar-brand-fixed { width: 100%; }
-        }
         </style>
-        <div class="sidebar-brand-fixed">
-            <div class="mark"></div>
+        <div class="sidebar-brand-overlay">
+            <div class="mark">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M2 12C2 12 5.5 5 12 5C18.5 5 22 12 22 12C22 12 18.5 19 12 19C5.5 19 2 12 2 12Z"
+                          stroke="#E8C4A0" stroke-width="1.6" stroke-linejoin="round"/>
+                    <circle cx="12" cy="12" r="3.2" stroke="#8B2942" stroke-width="1.6"/>
+                    <circle cx="12" cy="12" r="1.1" fill="#8B2942"/>
+                </svg>
+            </div>
             <div>
                 <div class="name">Skrining Anemia</div>
                 <div class="sub">Non-Invasif</div>
