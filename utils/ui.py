@@ -100,18 +100,6 @@ def inject_global_css():
 
         [data-testid="stSidebarNav"] {{ padding: 6px 10px; }}
 
-        /* Paksa brand selalu di urutan visual paling atas via flex-order,
-           karena st.navigation() merender nav-list ke posisi pertama DOM
-           terlepas urutan kode Python. */
-        [data-testid="stSidebarUserContent"] {{
-            display: flex;
-            flex-direction: column;
-        }}
-        [data-testid="stSidebarUserContent"] > div:has(.sidebar-brand) {{
-            order: -1;
-        }}
-        [data-testid="stSidebarNav"] {{ order: 0; }}
-
         [data-testid="stSidebarNav"] a {{
             border-radius: 8px;
             margin: 1px 2px;
@@ -239,16 +227,48 @@ def inject_global_css():
 
 
 def render_sidebar_brand():
-    """Header branding tetap di bagian atas sidebar (di atas daftar navigasi)."""
+    """Header branding di bagian atas sidebar, dipindah ke posisi pertama via JS.
+
+    st.navigation() selalu merender daftar menu di posisi pertama DOM
+    sidebar terlepas urutan kode Python atau CSS order/flex (struktur
+    container internalnya bisa bervariasi antar versi Streamlit/browser).
+    Cara paling pasti adalah memindahkan elemen secara aktif via JavaScript
+    setelah render selesai.
+    """
     st.markdown(
         """
-        <div class="sidebar-brand">
+        <div id="sidebar-brand-anchor" class="sidebar-brand">
             <div class="mark"></div>
             <div>
-                <div class="name">Spektrum</div>
-                <div class="sub">Skrining Konjungtiva</div>
+                <div class="name">Skrining Anemia</div>
+                <div class="sub">Non-Invasif</div>
             </div>
         </div>
+        <script>
+        (function() {
+            function moveBrandToTop() {
+                const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+                const brand = window.parent.document.getElementById('sidebar-brand-anchor');
+                if (!sidebar || !brand) return false;
+                const container = sidebar.querySelector('[data-testid="stSidebarContent"]')
+                    || sidebar.querySelector('[data-testid="stSidebarUserContent"]')
+                    || sidebar.firstElementChild;
+                if (!container) return false;
+                const brandWrapper = brand.closest('[data-testid="stVerticalBlock"]') || brand.parentElement;
+                if (container.firstElementChild !== brandWrapper) {
+                    container.insertBefore(brandWrapper, container.firstElementChild);
+                }
+                return true;
+            }
+            let attempts = 0;
+            const interval = setInterval(function() {
+                attempts += 1;
+                if (moveBrandToTop() || attempts > 20) {
+                    clearInterval(interval);
+                }
+            }, 100);
+        })();
+        </script>
         """,
         unsafe_allow_html=True,
     )

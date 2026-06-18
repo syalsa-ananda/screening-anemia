@@ -9,7 +9,7 @@ from views import skrining, edukasi, riwayat, faq
 
 
 st.set_page_config(
-    page_title="Spektrum — Skrining Anemia Non-Invasif",
+    page_title="Skrining Anemia Non-Invasif",
     page_icon="🩸",
     layout="wide",
 )
