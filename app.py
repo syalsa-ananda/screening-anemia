@@ -97,20 +97,20 @@ def render_beranda():
 
 
 # ── Daftarkan seluruh halaman ──────────────────────────────────────────────
-beranda_page = st.Page(render_beranda, title="Beranda", icon="🏠", url_path="beranda", default=True)
-skrining_page = st.Page(skrining.render, title="Skrining", icon="🔍", url_path="skrining")
-edukasi_page = st.Page(edukasi.render, title="Edukasi Anemia", icon="🩸", url_path="edukasi")
-riwayat_page = st.Page(riwayat.render, title="Riwayat", icon="📋", url_path="riwayat")
-faq_page = st.Page(faq.render, title="FAQ", icon="❓", url_path="faq")
-
-pg = st.navigation(
-    [beranda_page, skrining_page, edukasi_page, riwayat_page, faq_page],
-    position="sidebar",
-)
+beranda_page = st.Page(render_beranda, title="Beranda", url_path="beranda", default=True)
+skrining_page = st.Page(skrining.render, title="Skrining", url_path="skrining")
+edukasi_page = st.Page(edukasi.render, title="Edukasi Anemia", url_path="edukasi")
+riwayat_page = st.Page(riwayat.render, title="Riwayat", url_path="riwayat")
+faq_page = st.Page(faq.render, title="FAQ", url_path="faq")
 
 inject_global_css()
 
 with st.sidebar:
     render_sidebar_brand()
+
+pg = st.navigation(
+    [beranda_page, skrining_page, edukasi_page, riwayat_page, faq_page],
+    position="sidebar",
+)
 
 pg.run()
