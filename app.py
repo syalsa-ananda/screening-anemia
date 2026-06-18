@@ -97,11 +97,11 @@ def render_beranda():
 
 
 # ── Daftarkan seluruh halaman ──────────────────────────────────────────────
-beranda_page = st.Page(render_beranda, title="Beranda", icon="🏠", default=True)
-skrining_page = st.Page(skrining.render, title="Skrining", icon="🔍")
-edukasi_page = st.Page(edukasi.render, title="Edukasi Anemia", icon="🩸")
-riwayat_page = st.Page(riwayat.render, title="Riwayat", icon="📋")
-faq_page = st.Page(faq.render, title="FAQ", icon="❓")
+beranda_page = st.Page(render_beranda, title="Beranda", icon="🏠", url_path="beranda", default=True)
+skrining_page = st.Page(skrining.render, title="Skrining", icon="🔍", url_path="skrining")
+edukasi_page = st.Page(edukasi.render, title="Edukasi Anemia", icon="🩸", url_path="edukasi")
+riwayat_page = st.Page(riwayat.render, title="Riwayat", icon="📋", url_path="riwayat")
+faq_page = st.Page(faq.render, title="FAQ", icon="❓", url_path="faq")
 
 pg = st.navigation(
     [beranda_page, skrining_page, edukasi_page, riwayat_page, faq_page],
