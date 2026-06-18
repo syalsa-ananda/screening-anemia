@@ -6,28 +6,37 @@ Aplikasi web untuk skrining anemia non-invasif berbasis citra konjungtiva, mengg
 
 ```
 streamlit_app/
-├── app.py                      # Aplikasi utama Streamlit
-├── requirements.txt            # Daftar dependency Python
+├── app.py                          # Halaman Beranda
+├── pages/
+│   ├── 1_Skrining.py                # Upload, prediksi, hasil
+│   ├── 2_Edukasi_Anemia.py          # Edukasi kesehatan tentang anemia
+│   ├── 3_Riwayat.py                 # Riwayat prediksi sesi
+│   └── 4_FAQ.py                     # FAQ + disclaimer + info dataset/performa
+├── requirements.txt                # Daftar dependency Python
+├── packages.txt                    # Dependency sistem (libgl1 untuk OpenCV)
 ├── .streamlit/
-│   └── config.toml             # Konfigurasi tema aplikasi
+│   └── config.toml                 # Konfigurasi tema aplikasi
 ├── models/
-│   ├── README.md               # Instruksi mengisi folder ini
-│   ├── ensemble_final.pkl      # (Anda upload sendiri) Model Ensemble
-│   └── scaler_final.pkl        # (Anda upload sendiri) StandardScaler
+│   ├── README.md                   # Instruksi mengisi folder ini
+│   ├── ensemble_final.pkl          # (Anda upload sendiri) Model Ensemble
+│   └── scaler_final.pkl            # (Anda upload sendiri) StandardScaler
 ├── utils/
 │   ├── __init__.py
-│   ├── feature_extraction.py   # Pipeline ekstraksi fitur 346 dimensi
-│   └── model_loader.py         # Loader model dengan caching
-└── assets/                     # (opsional) gambar contoh, logo, dll.
+│   ├── ui.py                        # CSS global, navbar custom
+│   ├── feature_extraction.py       # Pipeline ekstraksi fitur 346 dimensi
+│   └── model_loader.py             # Loader model dengan caching
+└── assets/                         # (opsional) gambar contoh, logo, dll.
 ```
 
-## Fitur Aplikasi
+## Halaman Aplikasi
 
-1. **Upload citra konjungtiva** dalam format JPG, JPEG, atau PNG.
-2. **Preview pra-pemrosesan** — menampilkan citra asli berdampingan dengan citra setelah CLAHE.
-3. **Hasil prediksi** — label Anemia/Non-Anemia beserta tingkat kepercayaan (confidence).
-4. **Grafik probabilitas** — bar chart distribusi probabilitas kedua kelas.
-5. **Riwayat prediksi** — tabel berisi seluruh prediksi yang dilakukan dalam sesi browser saat ini (akan hilang jika halaman di-refresh atau ditutup).
+1. **🏠 Beranda** — pengantar sistem, alur kerja visual, tombol mulai skrining.
+2. **🔍 Skrining** — upload citra, preview CLAHE, hasil prediksi, grafik probabilitas.
+3. **🩸 Edukasi Anemia** — gejala, penyebab, dan pencegahan anemia secara umum.
+4. **📋 Riwayat** — daftar prediksi yang dilakukan dalam sesi browser saat ini.
+5. **❓ FAQ** — pertanyaan umum, disclaimer medis, dan info dataset/metodologi.
+
+Navigasi antar halaman menggunakan navbar custom di bagian atas (sidebar Streamlit disembunyikan).
 
 ## Langkah Persiapan Sebelum Deploy
 
