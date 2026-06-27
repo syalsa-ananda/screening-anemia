@@ -4,3 +4,9 @@ __pycache__/
 .DS_Store
 .venv/
 venv/
+
+# Secrets — jangan pernah di-commit
+.streamlit/secrets.toml
+
+# Model files (besar, tidak perlu di-commit)
+models/*.pkl

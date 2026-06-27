@@ -1,10 +1,12 @@
-"""
-Halaman Skrining — upload citra, prediksi, dan visualisasi hasil.
-"""
+
+import base64
+import io
+import json
 
 import cv2
 import numpy as np
 import pandas as pd
+import requests
 import streamlit as st
 from PIL import Image
 
@@ -15,14 +17,84 @@ from utils.ui import spectrum_divider
 
 LABELS = {0: "Non-Anemia", 1: "Anemia"}
 COLORS = {0: "#5C7A6B", 1: "#8B2942"}
+CONFIDENCE_THRESHOLD = 0.55   # lapis 2: ambang batas minimum keyakinan model
+GEMINI_MODEL = "gemini-1.5-flash"
 
 
-def pil_to_bgr(pil_image: Image.Image) -> np.ndarray:
+# ── Gemini validation ─────────────────────────────────────────────────────────
+
+def _get_gemini_key():
+    """Ambil API key dari st.secrets (prioritas) atau input manual."""
+    try:
+        return st.secrets["GEMINI_API_KEY"]
+    except Exception:
+        return st.session_state.get("gemini_key_input")
+
+
+def validate_conjunctiva(pil_image):
+    """
+    Validasi lewat Gemini Vision apakah foto adalah konjungtiva mata.
+
+    Returns dict:
+      - valid (bool): True jika foto konjungtiva
+      - reason (str): penjelasan singkat dari Gemini
+      - skipped (bool): True jika validasi dilewati (tidak ada API key / timeout)
+    """
+    api_key = _get_gemini_key()
+    if not api_key:
+        return {"valid": True, "reason": "", "skipped": True}
+
+    buf = io.BytesIO()
+    pil_image.convert("RGB").save(buf, format="JPEG", quality=85)
+    img_b64 = base64.b64encode(buf.getvalue()).decode()
+
+    prompt = (
+        "Lihat gambar ini dengan seksama. "
+        "Apakah gambar ini menunjukkan konjungtiva palpebra manusia — "
+        "yaitu bagian dalam kelopak mata bawah yang berwarna merah muda atau merah, "
+        "biasanya diambil dengan menarik kelopak mata bawah ke bawah? "
+        "Jawab HANYA dengan format JSON berikut tanpa teks lain:\n"
+        "{\"is_conjunctiva\": true/false, \"reason\": \"alasan singkat dalam Bahasa Indonesia\"}"
+    )
+
+    payload = {
+        "contents": [{"parts": [
+            {"text": prompt},
+            {"inline_data": {"mime_type": "image/jpeg", "data": img_b64}},
+        ]}],
+        "generationConfig": {"temperature": 0, "maxOutputTokens": 120},
+    }
+
+    try:
+        resp = requests.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{GEMINI_MODEL}:generateContent?key={api_key}",
+            json=payload,
+            timeout=15,
+        )
+        resp.raise_for_status()
+        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        text = text.replace("```json", "").replace("```", "").strip()
+        parsed = json.loads(text)
+        return {
+            "valid": bool(parsed.get("is_conjunctiva", False)),
+            "reason": parsed.get("reason", ""),
+            "skipped": False,
+        }
+    except requests.exceptions.Timeout:
+        return {"valid": True, "reason": "Validasi timeout.", "skipped": True}
+    except Exception:
+        return {"valid": True, "reason": "Validasi tidak tersedia.", "skipped": True}
+
+
+# ── Model prediction ──────────────────────────────────────────────────────────
+
+def pil_to_bgr(pil_image):
     rgb = np.array(pil_image.convert("RGB"))
     return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
 
 
-def run_prediction(img_bgr: np.ndarray, model, scaler):
+def run_prediction(img_bgr, model, scaler):
     features = extract_all_features(img_bgr).reshape(1, -1)
     features_scaled = scaler.transform(features)
 
@@ -43,6 +115,8 @@ def run_prediction(img_bgr: np.ndarray, model, scaler):
     }
 
 
+# ── Render ────────────────────────────────────────────────────────────────────
+
 def render():
     if "history" not in st.session_state:
         st.session_state.history = []
@@ -55,6 +129,23 @@ def render():
     )
     spectrum_divider(thin=True)
 
+    # ── Cek & input API key Gemini ────────────────────────────────────────
+    gemini_key = _get_gemini_key()
+    if not gemini_key:
+        with st.expander("⚙️ Aktifkan validasi foto (Gemini API Key)"):
+            st.caption(
+                "Masukkan Gemini API key untuk memastikan hanya foto konjungtiva "
+                "yang diproses. Tanpa ini, sistem tetap berjalan tanpa validasi jenis foto."
+            )
+            key_input = st.text_input(
+                "Gemini API Key", type="password",
+                placeholder="AIzaSy...", key="gemini_key_field",
+            )
+            if key_input:
+                st.session_state["gemini_key_input"] = key_input
+                st.success("API key aktif untuk sesi ini.")
+
+    # ── Load model ────────────────────────────────────────────────────────
     try:
         model, scaler = load_model_and_scaler()
         model_ready = True
@@ -72,16 +163,34 @@ def render():
         pil_image = Image.open(uploaded_file)
         img_bgr = pil_to_bgr(pil_image)
 
+        # ── LAPIS 1: Validasi Gemini ──────────────────────────────────────
+        with st.spinner("Memvalidasi jenis citra..."):
+            validation = validate_conjunctiva(pil_image)
+
+        if not validation["skipped"] and not validation["valid"]:
+            st.error(
+                "**Foto tidak dikenali sebagai konjungtiva mata.**\n\n"
+                f"{validation['reason']}\n\n"
+                "Pastikan foto menunjukkan bagian **dalam kelopak mata bawah** "
+                "dengan menarik kelopak sedikit ke bawah saat memotret. "
+                "Foto seperti screenshot, gambar umum, atau bagian mata lain "
+                "tidak dapat dianalisis oleh sistem ini."
+            )
+            st.image(pil_image, caption="Foto yang diunggah", width=320)
+            st.stop()
+
+        # ── LAPIS 2: Prediksi model ───────────────────────────────────────
         with st.spinner("Menganalisis citra..."):
             result = run_prediction(img_bgr, model, scaler)
 
-        st.session_state.history.append(
-            {
+        is_borderline = result["confidence"] < CONFIDENCE_THRESHOLD
+
+        if not is_borderline:
+            st.session_state.history.append({
                 "nama_file": uploaded_file.name,
                 "label": result["label"],
                 "confidence": result["confidence"],
-            }
-        )
+            })
 
         # ── Pra-pemrosesan ────────────────────────────────────────────────
         st.markdown('<div class="app-card">', unsafe_allow_html=True)
@@ -92,6 +201,17 @@ def render():
         with col_b:
             st.image(result["img_clahe"], caption="Setelah CLAHE", use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
+
+        # ── Lapis 2: Borderline warning ───────────────────────────────────
+        if is_borderline:
+            st.warning(
+                f"**Hasil tidak meyakinkan** — tingkat keyakinan model hanya "
+                f"{result['confidence']:.1%} (di bawah ambang batas 55%).\n\n"
+                "Kemungkinan penyebab: pencahayaan kurang memadai, foto buram, "
+                "atau area konjungtiva tidak terlihat jelas. "
+                "**Coba foto ulang** dengan cahaya lebih terang dan jarak lebih dekat."
+            )
+            st.stop()
 
         # ── Hasil prediksi ────────────────────────────────────────────────
         pred_color = COLORS[result["kode"]]
@@ -115,15 +235,13 @@ def render():
             st.success("Tidak ada indikasi anemia pada foto ini.")
         st.markdown("</div>", unsafe_allow_html=True)
 
-        # ── Grafik probabilitas ─────────────────────────────────────────────
+        # ── Grafik probabilitas ───────────────────────────────────────────
         st.markdown('<div class="app-card">', unsafe_allow_html=True)
         st.markdown("##### Distribusi probabilitas")
-        proba_df = pd.DataFrame(
-            {
-                "Kelas": ["Non-Anemia", "Anemia"],
-                "Probabilitas": [result["proba_non_anemia"], result["proba_anemia"]],
-            }
-        ).set_index("Kelas")
+        proba_df = pd.DataFrame({
+            "Kelas": ["Non-Anemia", "Anemia"],
+            "Probabilitas": [result["proba_non_anemia"], result["proba_anemia"]],
+        }).set_index("Kelas")
         st.bar_chart(proba_df, color=["#8B2942"], height=260)
 
         col_p1, col_p2 = st.columns(2)
