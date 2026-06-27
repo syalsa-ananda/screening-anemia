@@ -1,7 +1,17 @@
+"""
+Halaman Skrining — upload citra, prediksi, dan visualisasi hasil.
+
+Pipeline validasi dua lapis:
+  Lapis 1 — Gemini Vision: pastikan foto adalah konjungtiva mata sebelum
+             dikirim ke model ML (menolak foto jalanan, makanan, screenshot, dll.)
+  Lapis 2 — Threshold 55%: kalau confidence terlalu rendah bahkan setelah
+             lolos Gemini, tampilkan catatan "hasil borderline, coba foto ulang".
+"""
 
 import base64
 import io
 import json
+import logging
 
 import cv2
 import numpy as np
@@ -14,34 +24,30 @@ from utils.feature_extraction import extract_all_features, load_and_resize, prep
 from utils.model_loader import load_model_and_scaler
 from utils.ui import spectrum_divider
 
+logger = logging.getLogger(__name__)
 
 LABELS = {0: "Non-Anemia", 1: "Anemia"}
 COLORS = {0: "#5C7A6B", 1: "#8B2942"}
-CONFIDENCE_THRESHOLD = 0.55   # lapis 2: ambang batas minimum keyakinan model
+CONFIDENCE_THRESHOLD = 0.55
 GEMINI_MODEL = "gemini-1.5-flash"
 
 
 # ── Gemini validation ─────────────────────────────────────────────────────────
 
 def _get_gemini_key():
-    """Ambil API key dari st.secrets (prioritas) atau input manual."""
     try:
-        return st.secrets["GEMINI_API_KEY"]
-    except Exception:
+        key = st.secrets["GEMINI_API_KEY"]
+        logger.info(f"[Gemini] API key ditemukan di st.secrets, panjang: {len(str(key))}")
+        return key
+    except Exception as e:
+        logger.warning(f"[Gemini] Tidak ada key di st.secrets: {e}")
         return st.session_state.get("gemini_key_input")
 
 
 def validate_conjunctiva(pil_image):
-    """
-    Validasi lewat Gemini Vision apakah foto adalah konjungtiva mata.
-
-    Returns dict:
-      - valid (bool): True jika foto konjungtiva
-      - reason (str): penjelasan singkat dari Gemini
-      - skipped (bool): True jika validasi dilewati (tidak ada API key / timeout)
-    """
     api_key = _get_gemini_key()
     if not api_key:
+        logger.warning("[Gemini] Tidak ada API key — validasi dilewati")
         return {"valid": True, "reason": "", "skipped": True}
 
     buf = io.BytesIO()
@@ -72,18 +78,36 @@ def validate_conjunctiva(pil_image):
             json=payload,
             timeout=15,
         )
+        logger.info(f"[Gemini] Status response: {resp.status_code}")
         resp.raise_for_status()
-        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+        raw = resp.json()
+        text = raw["candidates"][0]["content"]["parts"][0]["text"].strip()
+        logger.info(f"[Gemini] Raw text response: {text}")
+
+        # Bersihkan semua varian markdown code fence
         text = text.replace("```json", "").replace("```", "").strip()
+
         parsed = json.loads(text)
-        return {
+        result = {
             "valid": bool(parsed.get("is_conjunctiva", False)),
             "reason": parsed.get("reason", ""),
             "skipped": False,
         }
+        logger.info(f"[Gemini] Hasil validasi: {result}")
+        return result
+
     except requests.exceptions.Timeout:
+        logger.error("[Gemini] Request timeout")
         return {"valid": True, "reason": "Validasi timeout.", "skipped": True}
-    except Exception:
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"[Gemini] HTTP error: {e}, response: {resp.text[:200]}")
+        return {"valid": True, "reason": "Gemini API error.", "skipped": True}
+    except json.JSONDecodeError as e:
+        logger.error(f"[Gemini] JSON parse error: {e}, text: {text}")
+        return {"valid": True, "reason": "Gagal parse respons Gemini.", "skipped": True}
+    except Exception as e:
+        logger.error(f"[Gemini] Unexpected error: {type(e).__name__}: {e}")
         return {"valid": True, "reason": "Validasi tidak tersedia.", "skipped": True}
 
 
@@ -97,13 +121,10 @@ def pil_to_bgr(pil_image):
 def run_prediction(img_bgr, model, scaler):
     features = extract_all_features(img_bgr).reshape(1, -1)
     features_scaled = scaler.transform(features)
-
     pred = int(model.predict(features_scaled)[0])
     proba = model.predict_proba(features_scaled)[0]
-
     img_resized = load_and_resize(img_bgr)
     img_clahe = preprocess_image(img_resized)
-
     return {
         "label": LABELS[pred],
         "kode": pred,
@@ -129,21 +150,25 @@ def render():
     )
     spectrum_divider(thin=True)
 
-    # ── Cek & input API key Gemini ────────────────────────────────────────
-    gemini_key = _get_gemini_key()
-    if not gemini_key:
-        with st.expander("⚙️ Aktifkan validasi foto (Gemini API Key)"):
-            st.caption(
-                "Masukkan Gemini API key untuk memastikan hanya foto konjungtiva "
-                "yang diproses. Tanpa ini, sistem tetap berjalan tanpa validasi jenis foto."
-            )
-            key_input = st.text_input(
-                "Gemini API Key", type="password",
-                placeholder="AIzaSy...", key="gemini_key_field",
-            )
-            if key_input:
-                st.session_state["gemini_key_input"] = key_input
-                st.success("API key aktif untuk sesi ini.")
+    # ── Debug info (hanya tampil di development, tidak di production) ─────
+    try:
+        key = st.secrets["GEMINI_API_KEY"]
+        st.info(f"✅ Gemini API key aktif (panjang: {len(str(key))} karakter)")
+    except Exception:
+        gemini_key = st.session_state.get("gemini_key_input")
+        if not gemini_key:
+            with st.expander("⚙️ Aktifkan validasi foto (Gemini API Key)"):
+                st.caption(
+                    "Masukkan Gemini API key untuk memastikan hanya foto konjungtiva "
+                    "yang diproses. Tanpa ini, sistem tetap berjalan tanpa validasi jenis foto."
+                )
+                key_input = st.text_input(
+                    "Gemini API Key", type="password",
+                    placeholder="AIzaSy...", key="gemini_key_field",
+                )
+                if key_input:
+                    st.session_state["gemini_key_input"] = key_input
+                    st.success("API key aktif untuk sesi ini.")
 
     # ── Load model ────────────────────────────────────────────────────────
     try:
@@ -167,14 +192,18 @@ def render():
         with st.spinner("Memvalidasi jenis citra..."):
             validation = validate_conjunctiva(pil_image)
 
+        # Tampilkan hasil validasi untuk debug
+        if not validation["skipped"]:
+            st.caption(f"🔍 Validasi Gemini: {'✅ Lolos' if validation['valid'] else '❌ Ditolak'} — {validation['reason']}")
+        else:
+            st.caption(f"⚠️ Validasi Gemini dilewati: {validation['reason'] or 'API key tidak ditemukan'}")
+
         if not validation["skipped"] and not validation["valid"]:
             st.error(
                 "**Foto tidak dikenali sebagai konjungtiva mata.**\n\n"
                 f"{validation['reason']}\n\n"
                 "Pastikan foto menunjukkan bagian **dalam kelopak mata bawah** "
-                "dengan menarik kelopak sedikit ke bawah saat memotret. "
-                "Foto seperti screenshot, gambar umum, atau bagian mata lain "
-                "tidak dapat dianalisis oleh sistem ini."
+                "dengan menarik kelopak sedikit ke bawah saat memotret."
             )
             st.image(pil_image, caption="Foto yang diunggah", width=320)
             st.stop()
@@ -207,9 +236,9 @@ def render():
             st.warning(
                 f"**Hasil tidak meyakinkan** — tingkat keyakinan model hanya "
                 f"{result['confidence']:.1%} (di bawah ambang batas 55%).\n\n"
-                "Kemungkinan penyebab: pencahayaan kurang memadai, foto buram, "
-                "atau area konjungtiva tidak terlihat jelas. "
-                "**Coba foto ulang** dengan cahaya lebih terang dan jarak lebih dekat."
+                "Kemungkinan penyebab: pencahayaan kurang, foto buram, atau "
+                "area konjungtiva tidak terlihat jelas. "
+                "**Coba foto ulang** dengan cahaya lebih terang."
             )
             st.stop()
 
