@@ -50,8 +50,17 @@ def validate_conjunctiva(pil_image):
         logger.warning("[Gemini] Tidak ada API key — validasi dilewati")
         return {"valid": True, "reason": "", "skipped": True}
 
+    # Resize ke maksimal 1024px di sisi terpanjang untuk menghindari batas ukuran Gemini
+    img_resized = pil_image.convert("RGB")
+    max_size = 1024
+    if max(img_resized.size) > max_size:
+        ratio = max_size / max(img_resized.size)
+        new_size = (int(img_resized.width * ratio), int(img_resized.height * ratio))
+        img_resized = img_resized.resize(new_size, Image.LANCZOS)
+        logger.info(f"[Gemini] Gambar direscale ke {new_size}")
+
     buf = io.BytesIO()
-    pil_image.convert("RGB").save(buf, format="JPEG", quality=85)
+    img_resized.save(buf, format="JPEG", quality=80)
     img_b64 = base64.b64encode(buf.getvalue()).decode()
 
     prompt = (
@@ -101,13 +110,18 @@ def validate_conjunctiva(pil_image):
         logger.error("[Gemini] Request timeout")
         return {"valid": True, "reason": "Validasi timeout.", "skipped": True}
     except requests.exceptions.HTTPError as e:
-        logger.error(f"[Gemini] HTTP error: {e}, response: {resp.text[:200]}")
-        return {"valid": True, "reason": "Gemini API error.", "skipped": True}
+        status = resp.status_code if resp else "?"
+        body = resp.text[:300] if resp else ""
+        logger.error(f"[Gemini] HTTP {status}: {body}")
+        st.warning(f"DEBUG — Gemini HTTP {status}: {body[:200]}", icon="🔧")
+        return {"valid": True, "reason": f"Gemini HTTP error {status}.", "skipped": True}
     except json.JSONDecodeError as e:
-        logger.error(f"[Gemini] JSON parse error: {e}, text: {text}")
+        logger.error(f"[Gemini] JSON parse error: {e}, text: '{text}'")
+        st.warning(f"DEBUG — Gemini JSON error. Raw: {text[:200]}", icon="🔧")
         return {"valid": True, "reason": "Gagal parse respons Gemini.", "skipped": True}
     except Exception as e:
-        logger.error(f"[Gemini] Unexpected error: {type(e).__name__}: {e}")
+        logger.error(f"[Gemini] Unexpected: {type(e).__name__}: {e}")
+        st.warning(f"DEBUG — {type(e).__name__}: {e}", icon="🔧")
         return {"valid": True, "reason": "Validasi tidak tersedia.", "skipped": True}
 
 
