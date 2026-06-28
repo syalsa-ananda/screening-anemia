@@ -151,10 +151,9 @@ def render():
     )
     spectrum_divider(thin=True)
 
-    # ── Status API key ────────────────────────────────────────────────────
+    # ── Cek API key (silent, tidak tampil di UI) ─────────────────────────
     try:
-        key = st.secrets["OPENAI_API_KEY"]
-        st.info(f"✅ OpenAI API key aktif (panjang: {len(str(key))} karakter)")
+        _ = st.secrets["OPENAI_API_KEY"]
     except Exception:
         if not st.session_state.get("openai_key_input"):
             with st.expander("⚙️ Aktifkan validasi foto (OpenAI API Key)"):
@@ -191,14 +190,6 @@ def render():
         # ── LAPIS 1: Validasi OpenAI Vision ──────────────────────────────
         with st.spinner("Memvalidasi jenis citra..."):
             validation = validate_conjunctiva(pil_image)
-
-        if not validation["skipped"]:
-            st.caption(
-                f"🔍 Validasi: {'✅ Lolos' if validation['valid'] else '❌ Ditolak'}"
-                f" — {validation['reason']}"
-            )
-        else:
-            st.caption(f"⚠️ Validasi dilewati: {validation['reason'] or 'API key tidak ditemukan'}")
 
         if not validation["skipped"] and not validation["valid"]:
             st.error(
