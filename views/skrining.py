@@ -1,11 +1,8 @@
 """
 Halaman Skrining — upload citra, prediksi, dan visualisasi hasil.
-
-Pipeline validasi dua lapis:
-  Lapis 1 — Gemini Vision: pastikan foto adalah konjungtiva mata sebelum
-             dikirim ke model ML (menolak foto jalanan, makanan, screenshot, dll.)
-  Lapis 2 — Threshold 55%: kalau confidence terlalu rendah bahkan setelah
-             lolos Gemini, tampilkan catatan "hasil borderline, coba foto ulang".
+Validasi dua lapis:
+  Lapis 1 — OpenAI GPT-4o-mini Vision: validasi apakah foto konjungtiva mata
+  Lapis 2 — Threshold 55%: tolak hasil yang terlalu tidak meyakinkan
 """
 
 import base64
@@ -16,7 +13,6 @@ import logging
 import cv2
 import numpy as np
 import pandas as pd
-import requests
 import streamlit as st
 from PIL import Image
 
@@ -29,103 +25,96 @@ logger = logging.getLogger(__name__)
 LABELS = {0: "Non-Anemia", 1: "Anemia"}
 COLORS = {0: "#5C7A6B", 1: "#8B2942"}
 CONFIDENCE_THRESHOLD = 0.55
-GEMINI_MODEL = "gemini-1.5-flash"
+OPENAI_MODEL = "gpt-4o-mini"
 
 
-# ── Gemini validation ─────────────────────────────────────────────────────────
-
-def _get_gemini_key():
+def _get_openai_key():
     try:
-        key = st.secrets["GEMINI_API_KEY"]
-        logger.info(f"[Gemini] API key ditemukan di st.secrets, panjang: {len(str(key))}")
-        return key
-    except Exception as e:
-        logger.warning(f"[Gemini] Tidak ada key di st.secrets: {e}")
-        return st.session_state.get("gemini_key_input")
+        key = st.secrets["OPENAI_API_KEY"]
+        logger.info(f"[OpenAI] Key ditemukan, panjang: {len(str(key))}")
+        return str(key).strip()
+    except Exception:
+        return st.session_state.get("openai_key_input")
 
 
 def validate_conjunctiva(pil_image):
-    api_key = _get_gemini_key()
+    """Validasi foto via OpenAI GPT-4o-mini Vision."""
+    api_key = _get_openai_key()
     if not api_key:
-        logger.warning("[Gemini] Tidak ada API key — validasi dilewati")
+        logger.warning("[OpenAI] Tidak ada API key — validasi dilewati")
         return {"valid": True, "reason": "", "skipped": True}
 
-    # Resize ke maksimal 1024px di sisi terpanjang untuk menghindari batas ukuran Gemini
-    img_resized = pil_image.convert("RGB")
-    max_size = 1024
-    if max(img_resized.size) > max_size:
-        ratio = max_size / max(img_resized.size)
-        new_size = (int(img_resized.width * ratio), int(img_resized.height * ratio))
-        img_resized = img_resized.resize(new_size, Image.LANCZOS)
-        logger.info(f"[Gemini] Gambar direscale ke {new_size}")
-
-    buf = io.BytesIO()
-    img_resized.save(buf, format="JPEG", quality=80)
-    img_b64 = base64.b64encode(buf.getvalue()).decode()
-
-    prompt = (
-        "Lihat gambar ini dengan seksama. "
-        "Apakah gambar ini menunjukkan konjungtiva palpebra manusia — "
-        "yaitu bagian dalam kelopak mata bawah yang berwarna merah muda atau merah, "
-        "biasanya diambil dengan menarik kelopak mata bawah ke bawah? "
-        "Jawab HANYA dengan format JSON berikut tanpa teks lain:\n"
-        "{\"is_conjunctiva\": true/false, \"reason\": \"alasan singkat dalam Bahasa Indonesia\"}"
-    )
-
-    payload = {
-        "contents": [{"parts": [
-            {"text": prompt},
-            {"inline_data": {"mime_type": "image/jpeg", "data": img_b64}},
-        ]}],
-        "generationConfig": {"temperature": 0, "maxOutputTokens": 120},
-    }
-
     try:
-        resp = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{GEMINI_MODEL}:generateContent?key={api_key}",
-            json=payload,
-            timeout=15,
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+
+        # Resize ke 800px max sebelum encode
+        img = pil_image.convert("RGB")
+        if max(img.size) > 800:
+            ratio = 800 / max(img.size)
+            img = img.resize(
+                (int(img.width * ratio), int(img.height * ratio)),
+                Image.LANCZOS
+            )
+
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        img_b64 = base64.b64encode(buf.getvalue()).decode()
+
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "Lihat gambar ini dengan seksama. "
+                                "Apakah gambar ini menunjukkan konjungtiva palpebra manusia — "
+                                "yaitu bagian dalam kelopak mata bawah yang berwarna merah muda "
+                                "atau merah, biasanya diambil dengan menarik kelopak mata bawah "
+                                "ke bawah? "
+                                "Jawab HANYA dengan format JSON berikut tanpa teks lain:\n"
+                                "{\"is_conjunctiva\": true/false, "
+                                "\"reason\": \"alasan singkat dalam Bahasa Indonesia\"}"
+                            ),
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{img_b64}",
+                                "detail": "low",
+                            },
+                        },
+                    ],
+                }
+            ],
+            max_tokens=100,
+            temperature=0,
         )
-        logger.info(f"[Gemini] Status response: {resp.status_code}")
-        resp.raise_for_status()
 
-        raw = resp.json()
-        text = raw["candidates"][0]["content"]["parts"][0]["text"].strip()
-        logger.info(f"[Gemini] Raw text response: {text}")
-
-        # Bersihkan semua varian markdown code fence
+        text = response.choices[0].message.content.strip()
         text = text.replace("```json", "").replace("```", "").strip()
+        logger.info(f"[OpenAI] Response: {text}")
 
         parsed = json.loads(text)
-        result = {
+        return {
             "valid": bool(parsed.get("is_conjunctiva", False)),
             "reason": parsed.get("reason", ""),
             "skipped": False,
         }
-        logger.info(f"[Gemini] Hasil validasi: {result}")
-        return result
 
-    except requests.exceptions.Timeout:
-        logger.error("[Gemini] Request timeout")
-        return {"valid": True, "reason": "Validasi timeout.", "skipped": True}
-    except requests.exceptions.HTTPError as e:
-        status = resp.status_code if resp else "?"
-        body = resp.text[:300] if resp else ""
-        logger.error(f"[Gemini] HTTP {status}: {body}")
-        st.warning(f"DEBUG — Gemini HTTP {status}: {body[:200]}", icon="🔧")
-        return {"valid": True, "reason": f"Gemini HTTP error {status}.", "skipped": True}
     except json.JSONDecodeError as e:
-        logger.error(f"[Gemini] JSON parse error: {e}, text: '{text}'")
-        st.warning(f"DEBUG — Gemini JSON error. Raw: {text[:200]}", icon="🔧")
-        return {"valid": True, "reason": "Gagal parse respons Gemini.", "skipped": True}
+        logger.error(f"[OpenAI] JSON parse error: {e}, text: '{text}'")
+        st.warning(f"🔧 DEBUG: Gagal parse JSON — {text[:200]}", icon="⚠️")
+        return {"valid": True, "reason": "Gagal parse respons.", "skipped": True}
     except Exception as e:
-        logger.error(f"[Gemini] Unexpected: {type(e).__name__}: {e}")
-        st.warning(f"DEBUG — {type(e).__name__}: {e}", icon="🔧")
+        err_msg = f"{type(e).__name__}: {str(e)[:300]}"
+        logger.error(f"[OpenAI] Error: {err_msg}")
+        st.warning(f"🔧 DEBUG: {err_msg}", icon="⚠️")
         return {"valid": True, "reason": "Validasi tidak tersedia.", "skipped": True}
 
-
-# ── Model prediction ──────────────────────────────────────────────────────────
 
 def pil_to_bgr(pil_image):
     rgb = np.array(pil_image.convert("RGB"))
@@ -150,8 +139,6 @@ def run_prediction(img_bgr, model, scaler):
     }
 
 
-# ── Render ────────────────────────────────────────────────────────────────────
-
 def render():
     if "history" not in st.session_state:
         st.session_state.history = []
@@ -164,24 +151,23 @@ def render():
     )
     spectrum_divider(thin=True)
 
-    # ── Debug info (hanya tampil di development, tidak di production) ─────
+    # ── Status API key ────────────────────────────────────────────────────
     try:
-        key = st.secrets["GEMINI_API_KEY"]
-        st.info(f"✅ Gemini API key aktif (panjang: {len(str(key))} karakter)")
+        key = st.secrets["OPENAI_API_KEY"]
+        st.info(f"✅ OpenAI API key aktif (panjang: {len(str(key))} karakter)")
     except Exception:
-        gemini_key = st.session_state.get("gemini_key_input")
-        if not gemini_key:
-            with st.expander("⚙️ Aktifkan validasi foto (Gemini API Key)"):
+        if not st.session_state.get("openai_key_input"):
+            with st.expander("⚙️ Aktifkan validasi foto (OpenAI API Key)"):
                 st.caption(
-                    "Masukkan Gemini API key untuk memastikan hanya foto konjungtiva "
-                    "yang diproses. Tanpa ini, sistem tetap berjalan tanpa validasi jenis foto."
+                    "Masukkan OpenAI API key untuk memastikan hanya foto "
+                    "konjungtiva yang diproses."
                 )
                 key_input = st.text_input(
-                    "Gemini API Key", type="password",
-                    placeholder="AIzaSy...", key="gemini_key_field",
+                    "OpenAI API Key", type="password",
+                    placeholder="sk-...", key="openai_key_field",
                 )
                 if key_input:
-                    st.session_state["gemini_key_input"] = key_input
+                    st.session_state["openai_key_input"] = key_input
                     st.success("API key aktif untuk sesi ini.")
 
     # ── Load model ────────────────────────────────────────────────────────
@@ -202,22 +188,24 @@ def render():
         pil_image = Image.open(uploaded_file)
         img_bgr = pil_to_bgr(pil_image)
 
-        # ── LAPIS 1: Validasi Gemini ──────────────────────────────────────
+        # ── LAPIS 1: Validasi OpenAI Vision ──────────────────────────────
         with st.spinner("Memvalidasi jenis citra..."):
             validation = validate_conjunctiva(pil_image)
 
-        # Tampilkan hasil validasi untuk debug
         if not validation["skipped"]:
-            st.caption(f"🔍 Validasi Gemini: {'✅ Lolos' if validation['valid'] else '❌ Ditolak'} — {validation['reason']}")
+            st.caption(
+                f"🔍 Validasi: {'✅ Lolos' if validation['valid'] else '❌ Ditolak'}"
+                f" — {validation['reason']}"
+            )
         else:
-            st.caption(f"⚠️ Validasi Gemini dilewati: {validation['reason'] or 'API key tidak ditemukan'}")
+            st.caption(f"⚠️ Validasi dilewati: {validation['reason'] or 'API key tidak ditemukan'}")
 
         if not validation["skipped"] and not validation["valid"]:
             st.error(
                 "**Foto tidak dikenali sebagai konjungtiva mata.**\n\n"
                 f"{validation['reason']}\n\n"
-                "Pastikan foto menunjukkan bagian **dalam kelopak mata bawah** "
-                "dengan menarik kelopak sedikit ke bawah saat memotret."
+                "Pastikan foto menunjukkan bagian dalam kelopak mata bawah — "
+                "tarik kelopak sedikit ke bawah saat memotret."
             )
             st.image(pil_image, caption="Foto yang diunggah", width=320)
             st.stop()
@@ -235,7 +223,7 @@ def render():
                 "confidence": result["confidence"],
             })
 
-        # ── Pra-pemrosesan ────────────────────────────────────────────────
+        # Pra-pemrosesan
         st.markdown('<div class="app-card">', unsafe_allow_html=True)
         st.markdown("##### Penyetaraan kontras")
         col_a, col_b = st.columns(2)
@@ -245,25 +233,22 @@ def render():
             st.image(result["img_clahe"], caption="Setelah CLAHE", use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-        # ── Lapis 2: Borderline warning ───────────────────────────────────
         if is_borderline:
             st.warning(
-                f"**Hasil tidak meyakinkan** — tingkat keyakinan model hanya "
-                f"{result['confidence']:.1%} (di bawah ambang batas 55%).\n\n"
-                "Kemungkinan penyebab: pencahayaan kurang, foto buram, atau "
-                "area konjungtiva tidak terlihat jelas. "
-                "**Coba foto ulang** dengan cahaya lebih terang."
+                f"**Hasil tidak meyakinkan** — keyakinan hanya {result['confidence']:.1%} "
+                f"(di bawah 55%). Coba foto ulang dengan cahaya lebih terang."
             )
             st.stop()
 
-        # ── Hasil prediksi ────────────────────────────────────────────────
+        # Hasil prediksi
         pred_color = COLORS[result["kode"]]
         st.markdown('<div class="app-card">', unsafe_allow_html=True)
         st.markdown("##### Hasil")
         col_pred, col_conf = st.columns(2)
         with col_pred:
             st.markdown(
-                f"<h2 style='color:{pred_color}; font-style:italic; margin:0;'>{result['label']}</h2>",
+                f"<h2 style='color:{pred_color}; font-style:italic; margin:0;'>"
+                f"{result['label']}</h2>",
                 unsafe_allow_html=True,
             )
         with col_conf:
@@ -278,7 +263,7 @@ def render():
             st.success("Tidak ada indikasi anemia pada foto ini.")
         st.markdown("</div>", unsafe_allow_html=True)
 
-        # ── Grafik probabilitas ───────────────────────────────────────────
+        # Grafik probabilitas
         st.markdown('<div class="app-card">', unsafe_allow_html=True)
         st.markdown("##### Distribusi probabilitas")
         proba_df = pd.DataFrame({
